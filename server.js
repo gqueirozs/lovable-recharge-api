@@ -93,11 +93,12 @@ const server = http.createServer((req, res) => {
       success: true,
       message: 'Mock reseller API online',
       endpoints: [
-        '/functions/v1/reseller-api?seller=TOKEN&pacote=500&client=João%20Silva&convite=CODIGO',
+        'POST /functions/v1/reseller-api (body: { seller, action, pacote, client, convite })',
         '/admin/balance',
         '/admin/reset-balance?value=100',
         '/health'
       ],
+      exemplo: 'curl -X POST "..." -H "Content-Type: application/json" -d \'{"seller":"TOKEN","action":"create-order","pacote":500,"client":"João Silva","convite":"CODIGO"}\'',
       timestamp: nowIso()
     });
   }
@@ -132,13 +133,53 @@ const server = http.createServer((req, res) => {
     });
   }
 
-  if (req.method === 'GET' && url.pathname === '/functions/v1/reseller-api') {
-    const seller = url.searchParams.get('seller');
-    const pacote = Number(url.searchParams.get('pacote'));
-    const client = url.searchParams.get('client') || 'Cliente Teste';
-    const convite = url.searchParams.get('convite') || null;
+  // POST /functions/v1/reseller-api com body JSON
+  if (req.method === 'POST' && url.pathname === '/functions/v1/reseller-api') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      let seller, pacote, client, convite, action;
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        seller = parsed.seller;
+        action = parsed.action || 'create-order';
+        pacote = Number(parsed.pacote);
+        client = parsed.client || 'Cliente Teste';
+        convite = parsed.convite || null;
+      } catch {
+        return json(res, 400, {
+          success: false,
+          error: {
+            code: 'INVALID_JSON',
+            message: 'Corpo da requisição deve ser JSON válido.'
+          },
+          timestamp: nowIso()
+        });
+      }
 
-    if (!rateLimitCheck(seller, req.socket.remoteAddress)) {
+      if (action !== 'create-order') {
+        return json(res, 400, {
+          success: false,
+          error: {
+            code: 'INVALID_ACTION',
+            message: 'Ação inválida. Use "create-order".'
+          },
+          timestamp: nowIso()
+        });
+      }
+
+      handleCreateOrder(res, seller, pacote, client, convite, req);
+    });
+    return;
+  }
+
+  return notFound(res);
+});
+
+function handleCreateOrder(res, seller, pacote, client, convite, req) {
+  if (!rateLimitCheck(seller, req.socket.remoteAddress)) {
       return json(res, 429, {
         success: false,
         error: {
@@ -220,10 +261,7 @@ const server = http.createServer((req, res) => {
       },
       timestamp: nowIso()
     });
-  }
-
-  return notFound(res);
-});
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Mock reseller API running on port ${PORT}`);
