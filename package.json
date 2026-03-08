@@ -1,0 +1,15 @@
+{
+  "name": "mock-reseller-api",
+  "version": "1.0.0",
+  "description": "Mock API em Node.js + Express para simular integração de pedidos",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
